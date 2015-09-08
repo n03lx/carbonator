@@ -3,30 +3,70 @@
 # Released under GPL Version 2 license.
 # Use at your own risk
 
-if [[ -n $1 && -n $2 && -n $3 ]] #not provide enough parameters to launch carbonator
+
+#Modified by Krysta Cox for automated NCATS Web Application Assessment purposes
+
+if [[ -n $1 ]] #not provide enough parameters to launch carbonator
 then
-	SCHEME=$1
-	FQDN=$2
-	PORT=$3
-	if [[ -n $4 ]]
+	DOMAIN=$1
+
+	burpPath="/root/Tools/burp/burpsuite_pro_v1.6.25.jar" #UPDATE this when a new version of burp is installed
+	now=$(date +%m%d%Y-%H%M%S)
+	#Report and Log directories
+	ReportPath="/root/Tools/burp/carbonator/reports/$now"
+	mkdir $ReportPath
+	nMapReport="$ReportPath/nmap_$now.xml"
+	EyeWitnessReport="$ReportPath/eyewitness_targets_$now.txt"
+	Log="/root/Tools/burp/carbonator/logs/$now.txt"
+	Tmp="/root/Tools/burp/carbonator/logs/output_$now.txt"
+
+	echo "======================+++ AUTOMATED WEB RECON +++======================"
+	echo "+++NMAP DISCOVERY+++"
+	echo "[*] Launching nmap scan..."
+	nmap -sS -p80,443 -oX $ReportPath/nmap_$now.xml $DOMAIN
+	echo "[*] nMap complete. Report = $nMapReport"
+	
+	echo
+	echo "+++EYEWITNESS CAPTURE+++"
+	echo "[*] Launching eyewitness scan..."	
+	echo
+	#generate eyewitness report
+	python /root/Tools/eyewitness/EyeWitness.py -f $nMapReport -d $ReportPath/EyeWitness_$now &> $Log
+	#generate eyewitness target report file to feed to burp
+	python /root/Tools/eyewitness/EyeWitness.py -f $nMapReport --createtargets $EyeWitnessReport &> $Log 
+	echo "Identified targets:"
+	cat $EyeWitnessReport
+	echo
+	echo "[*] EyeWitness completed. Report = $EyeWitnessReport"
+
+	#deliminate target output to import into burp scanner command line arguments
+	while IFS=':' read A B C;do
+    		echo "$A ${B:2} $C" >> $Tmp
+	done < $EyeWitnessReport
+
+	echo
+	echo "+++BURP SPIDER & SCAN+++"
+	echo "[*] Launching burp scan..."
+	echo
+	echo "This scan runs in the background and may take awhile. Be patient."
+	cat $Tmp | xargs -L1 java -jar -Xmx1024m -Djava.awt.headless=true $burpPath
+	echo "[*] Burp completed."
+	echo
+	echo "DONE. Reports stored in $ReportPath"
+
+	#cleanup
+	rm $Tmp
+
+	#Text message alert when burp scan is complete
+	if [[ -n $2 ]]
 	then
-		FOLDER=$4
+		PHONE=$2
+		curl http://textbelt.com/text -d number=$PHONE -d "message=Recon completed." &> /dev/null
 	fi
 
-	if [[ -n $5 ]]
-	then
-		EMAIL=$5
-		echo Launching Scan against $1://$2:$3$4 EMailing reports to $5
-		java -jar -Xmx1024m ../burp_suite/burpsuite_pro_v1.6.02.jar $SCHEME $FQDN $PORT $FOLDER
-		echo 'Your scan results are attached to this email. Please visit https://www.integrissecurity.com/index.php?resources=Carbonator for more information.' | mutt -s 'Integris Security Carbonator Results' $5 -a IntegrisSecurity_Carbonator_$1_$2_$3.html && rm IntegrisSecurity_Carbonator_$1_$2_$3.html
-	else
-		echo Launching Scan against $1://$2:$3$4
-		java -jar -Xmx1024m ../burp_suite/burpsuite_pro_v1.6.02.jar $SCHEME $FQDN $PORT $FOLDER
-	fi
 else
-	echo Usage: $0 scheme fqdn port path email
-	echo '    'Example: $0 http localhost 80 /folder carbonator@integrissecurity.com
-	echo '    Scan multiple sites: cat scheme_fqdn_port.txt | xargs -L1 '$0
+	echo "Usage: $0 domain phone#"
+	echo '    'Example: $0 localhost 5555555555
 fi
 
 exit
