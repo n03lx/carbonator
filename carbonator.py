@@ -9,6 +9,7 @@
 from burp import IBurpExtender
 from burp import IHttpListener
 from burp import IScannerListener
+from burp import IHttpRequestResponse
 from java.net import URL
 from java.io import File
 
@@ -24,6 +25,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	self.spider_results=[]
 	self.scanner_results=[]
 	self.packet_timeout=5
+	self.sitemap_results=[]
 
 	self.last_packet_seen= int(time.time()) #initialize the start of the spider/scan
 
@@ -32,7 +34,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	else:
 		self.clivars = True
 
-	print "Initiating Carbonator Against: ", str(self.url)
+	#print "Initiating Carbonator Against: ", str(self.url)
 	#add to scope if not already in there.
 	if self._callbacks.isInScope(self.url) == 0:
 		self._callbacks.includeInScope(self.url)
@@ -40,9 +42,9 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	#added to ensure that the root directory is scanned
 	base_request = str.encode(str("GET "+self.path+" HTTP/1.1\nHost: "+self.fqdn+"\n\n"))
 	if(self.scheme == 'HTTPS'):
-		print self._callbacks.doActiveScan(self.fqdn,self.port,1,base_request)
+		self._callbacks.doActiveScan(self.fqdn,self.port,1,base_request)
 	else:
-		print self._callbacks.doActiveScan(self.fqdn,self.port,0,base_request)
+		self._callbacks.doActiveScan(self.fqdn,self.port,0,base_request)
 
 	self._callbacks.sendToSpider(self.url)
 	self._callbacks.registerHttpListener(self)
@@ -50,11 +52,18 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 
 	while int(time.time())-self.last_packet_seen <= self.packet_timeout:
 		time.sleep(1)
-	print "No packets seen in the last", self.packet_timeout, "seconds."
-	print "Removing Listeners"
+	#print "No packets seen in the last", self.packet_timeout, "seconds."
+	#print "Removing Listeners"
 	self._callbacks.removeHttpListener(self)
 	self._callbacks.removeScannerListener(self)
 	self._callbacks.excludeFromScope(self.url)
+
+	print "\nIssue identified: Issue #",len(self.scanner_results)
+	print "URLs sent to Vulnerability Scanner: URL #",len(self.spider_results)
+
+	print "\nGenerating Site Map"
+	self.generateSiteMap(self.fqdn)
+	print "Site Map Generated"
 
 	print "Generating Report"
 	self.generateReport('HTML')
@@ -71,7 +80,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	self.last_packet_seen = int(time.time())
 	if tool_flag == self._callbacks.TOOL_SPIDER and isRequest: #if is a spider request then send to scanner
 		self.spider_results.append(current)
-		print "Sending new URL to Vulnerability Scanner: URL #",len(self.spider_results)
 		if self.scheme == 'https':
 			self._callbacks.doActiveScan(self.fqdn,self.port,1,current.getRequest()) #returns scan queue, push to array
 		else:
@@ -80,14 +88,23 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 
     def newScanIssue(self, issue):
 	self.scanner_results.append(issue)
-	print "New issue identified: Issue #",len(self.scanner_results);
 	return
+
+    def generateSiteMap(self, urlprefix):
+	self.sitemap_results = self._callbacks.getSiteMap(urlprefix)
+	sitemap_file = open('SiteMap.txt', 'a+')
+	print len(self.sitemap_results)
+	for item in range(len(self.sitemap_results)):
+		sitemap_file.write(self._helpers.getSiteMap(self.sitemap_results[item]).getUrl())
+		print self.sitemap_results[item]
+	sitemap_file.close()
+	return	
 
     def generateReport(self, format):
 	if format != 'XML':
 		format = 'HTML'	
 
-	file_name = 'IntegrisSecurity_Carbonator_'+self.scheme+'_'+self.fqdn+'_'+str(self.port)+'.'+format.lower()
+	file_name = 'Burp_Carbonator_'+self.scheme+'_'+self.fqdn+'_'+str(self.port)+'.'+format.lower()
 	self._callbacks.generateScanReport(format,self.scanner_results,File(file_name))
 
 	time.sleep(5)
