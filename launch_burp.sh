@@ -54,6 +54,10 @@ then
 	echo
 	echo "DONE. Reports stored in $ReportPath"
 
+	#move sitemap to report folder
+	mv "/root/Tools/burp/carbonator/SiteMap.txt" "$ReportPath/SiteMap.txt"
+	mv /root/Tools/burp/carbonator/Burp_Carbonator*.html "$ReportPath/BurpReport.html"
+
 	#cleanup
 	rm $Tmp
 
