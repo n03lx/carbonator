@@ -62,7 +62,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	print "URLs sent to Vulnerability Scanner: URL #",len(self.spider_results)
 
 	print "\nGenerating Site Map"
-	self.generateSiteMap(self.fqdn)
+	self.generateSiteMap(None)
 	print "Site Map Generated"
 
 	print "Generating Report"
@@ -73,7 +73,6 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 
 	if self.clivars:
 		self._callbacks.exitSuite(False)
-		
 	return
 
     def processHttpMessage(self, tool_flag, isRequest, current):
@@ -93,10 +92,16 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
     def generateSiteMap(self, urlprefix):
 	self.sitemap_results = self._callbacks.getSiteMap(urlprefix)
 	sitemap_file = open('SiteMap.txt', 'a+')
-	print len(self.sitemap_results)
+	input = []
+	output = []
 	for item in range(len(self.sitemap_results)):
-		sitemap_file.write(self._helpers.getSiteMap(self.sitemap_results[item]).getUrl())
-		print self.sitemap_results[item]
+		s = str(self.sitemap_results[item].getUrl())
+		if self.fqdn in s:
+			input.append(s)
+		for i in input:
+			if i not in output:
+				output.append(i)
+				sitemap_file.write(i+"\n")
 	sitemap_file.close()
 	return	
 
