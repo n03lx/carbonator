@@ -34,7 +34,7 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	else:
 		self.clivars = True
 
-	#print "Initiating Carbonator Against: ", str(self.url)
+	print "\n[*] Initiating Carbonator Against: ", str(self.url)
 	#add to scope if not already in there.
 	if self._callbacks.isInScope(self.url) == 0:
 		self._callbacks.includeInScope(self.url)
@@ -57,18 +57,18 @@ class BurpExtender(IBurpExtender, IHttpListener, IScannerListener):
 	self._callbacks.removeHttpListener(self)
 	self._callbacks.removeScannerListener(self)
 	self._callbacks.excludeFromScope(self.url)
+	self._callbacks.saveState(File('BurpState'))
 
-	print "\nIssue identified: Issue #",len(self.scanner_results)
+	print "Issue identified: Issue #",len(self.scanner_results)
 	print "URLs sent to Vulnerability Scanner: URL #",len(self.spider_results)
 
-	print "\nGenerating Site Map"
+	#print "\n [*] Generating Site Map..."
 	self.generateSiteMap(None)
-	print "Site Map Generated"
 
-	print "Generating Report"
+	#print "[*] Generating Report..."
 	self.generateReport('HTML')
-	print "Report Generated"
-	print "Closing Burp in", self.packet_timeout, "seconds."
+	print "[*] Site Map and Report Generated."
+	#print "Closing Burp in", self.packet_timeout, "seconds."
 	time.sleep(self.packet_timeout)
 
 	if self.clivars:
