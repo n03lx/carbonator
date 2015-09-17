@@ -20,6 +20,8 @@ then
 	HostList="hostlist_$now.txt"
 	Tmp="output_$now.txt"
 
+	starttime=$(date +"%s")
+
 	echo "======================+++ AUTOMATED WEB RECON +++======================"
 	#dependencies
 	if ! which xmlstarlet  > /dev/null
@@ -60,6 +62,8 @@ then
 		echo "$A ${B:2} $port" >> $HostList
 	done < $Tmp
 
+	#DIRBUSTER
+
 	echo
 	echo "+++BURP SPIDER & SCAN+++"
 	echo "[*] Launching burp scan against $(wc -l < $HostList) URL(s)..."
@@ -67,7 +71,10 @@ then
 	cat $HostList | xargs -L1 java -jar -Xmx1024m -Djava.awt.headless=true $burpPath
 	echo "[*] Burp completed."
 	echo
+	endtime=$(date +"%s")
 	echo "DONE. Reports stored in $ReportPath"
+	duration=$((endtime-starttime))
+	echo "Duration: $(($duration / 60)) minutes and $(($duration % 60)) seconds"
 
 	#move sitemap to report folder
 	mv "/root/Tools/burp/carbonator/BurpState" "$ReportPath/BurpState"
